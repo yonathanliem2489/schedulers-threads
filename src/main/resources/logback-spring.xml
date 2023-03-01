@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true">
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <property resource="application.properties"/>
+  <!--  <property resource="bootstrap.properties" />-->
+
+  <springProperty scope="context" name="applicationName" source="spring.application.name"/>
+
+  <property name="STDOUT_LOG_PATTERN"
+    value="[%level] %date{YYYY-MM-dd HH:mm:ss.SSS} [${applicationName}][%X{traceId:-}][%X{spanId:-}] [%thread] %logger{10} %msg%n" />
+
+  <appender class="ch.qos.logback.core.ConsoleAppender" name="STDOUT">
+    <encoder>
+      <pattern>${STDOUT_LOG_PATTERN}</pattern>
+    </encoder>
+  </appender>
+
+<!--  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">-->
+<!--    <encoder>-->
+<!--      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId},%X{spanId}] - %msg%n</pattern>-->
+<!--    </encoder>-->
+<!--  </appender>-->
+
+
+  <logger name="demo.clean.code" level="INFO" additivity="false">
+    <appender-ref ref="STDOUT"/>
+  </logger>
+
+  <logger name="reactor.netty.http.client" level="INFO" additivity="false">
+    <appender-ref ref="STDOUT"/>
+  </logger>
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+<!--    <appender-ref ref="CONSOLE"/>-->
+  </root>
+</configuration>

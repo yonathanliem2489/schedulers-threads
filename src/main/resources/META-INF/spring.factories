@@ -1,0 +1,3 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  demo.clean.code.EndpointConfiguration,\
+  demo.clean.code.SchedulersEndpointConfiguration
