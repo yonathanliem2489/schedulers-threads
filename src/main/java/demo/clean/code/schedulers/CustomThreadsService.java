@@ -42,9 +42,18 @@ public class CustomThreadsService {
   public Mono<Void> handle() {
     String uuid = UUID.randomUUID().toString();
     log.info("custom thread receive request, uuid {}", uuid);
+//    return Mono.fromRunnable(() -> {
+//      try {
+//        Thread.sleep(2000L);
+//      } catch (InterruptedException e) {
+//        throw new RuntimeException(e);
+//      }
+//      log.info("custom thread end process, uuid {}", uuid);
+//    }).then().subscribeOn(Schedulers.fromExecutor(executor));
+
     return managementThreads(Mono.fromRunnable(() -> {
       try {
-        Thread.sleep(3000L);
+        Thread.sleep(2000L);
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }

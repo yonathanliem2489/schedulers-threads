@@ -5,10 +5,13 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
 import static org.springframework.web.reactive.function.server.RequestPredicates.path;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
+import demo.clean.code.model.factory.NamingThreadFactory;
 import demo.clean.code.schedulers.BoundedElasticService;
 import demo.clean.code.schedulers.CustomCachedBoundedElasticService;
 import demo.clean.code.schedulers.CustomCachedParallelService;
 import demo.clean.code.schedulers.CustomThreadsService;
+import demo.clean.code.schedulers.LinkedBlockingThreadsService;
+import demo.clean.code.schedulers.MultipleBoundedElasticService;
 import demo.clean.code.schedulers.NewBoundedElasticService;
 import demo.clean.code.schedulers.NewParallelService;
 import demo.clean.code.schedulers.NewSingleService;
@@ -16,10 +19,10 @@ import demo.clean.code.schedulers.ParallelService;
 import demo.clean.code.schedulers.ParallelUsingNewBoundedService;
 import demo.clean.code.schedulers.SingleService;
 import demo.clean.code.schedulers.TiketThreadsService;
-import demo.clean.code.schedulers.config.CachedScheduler;
 import demo.clean.code.schedulers.config.SchedulersUtils;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import java.time.Duration;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -60,6 +63,20 @@ public class SchedulersEndpointConfiguration {
     return route(requestPredicate, handlerFunction);
   }
 
+  @Bean
+  RouterFunction<ServerResponse> multipleBoundedElasticEndpoint() {
+
+    RequestPredicate requestPredicate = method(HttpMethod.GET)
+        .and(path("/test-multiple-bounded-elastic"))
+        .and(accept(MediaType.APPLICATION_JSON));
+
+    MultipleBoundedElasticService multipleBoundedElasticService = new MultipleBoundedElasticService();
+    HandlerFunction<ServerResponse> handlerFunction = request -> multipleBoundedElasticService.handle()
+        .then(ServerResponse.status(HttpStatus.OK).build());
+
+    return route(requestPredicate, handlerFunction);
+  }
+
   @Autowired
   @Qualifier("tiketElasticServiceSchedulers")
   private Scheduler tiketElasticServiceSchedulers = Schedulers.elastic();
@@ -88,8 +105,9 @@ public class SchedulersEndpointConfiguration {
 
     String threadName = "customCachedThreadBounded";
     Supplier<Scheduler> schedulerSupplier =
-        () -> Schedulers.newBoundedElastic(300, 50,
-            threadName, 30, false);
+        () -> Schedulers.newBoundedElastic(1000, 50,
+            new DefaultThreadFactory(threadName, false, Thread.NORM_PRIORITY),
+            30);
 
     CustomCachedBoundedElasticService customCachedBoundedElasticService =
         new CustomCachedBoundedElasticService(SchedulersUtils
@@ -135,19 +153,49 @@ public class SchedulersEndpointConfiguration {
     Duration pollingTimeout = Duration.ofMillis(60 * 1000L);
 
     int corePoolSize = 0;
-    int maxPoolSize = 800;
+    int maxPoolSize = 2000;
 
     double maxPoolSizeLimitByPercent = 50;
 
     ThreadPoolExecutor executor = new ThreadPoolExecutor(corePoolSize, maxPoolSize,
         30L, TimeUnit.SECONDS,
         new SynchronousQueue<>(),
-        new DefaultThreadFactory("customThreadPool", false, 5));
+        new DefaultThreadFactory("customThreadPoolSynchronousQueue", false, 1));
 
 
     CustomThreadsService customThreadsService =
         new CustomThreadsService(executor, pollingInterval, pollingTimeout, maxPoolSizeLimitByPercent);
     HandlerFunction<ServerResponse> handlerFunction = request -> customThreadsService.handle()
+        .then(ServerResponse.status(HttpStatus.OK).build());
+
+    return route(requestPredicate, handlerFunction);
+  }
+
+  @Bean
+  RouterFunction<ServerResponse> customThreadByLinkedBlockingEndpoint() {
+
+    RequestPredicate requestPredicate = method(HttpMethod.GET)
+        .and(path("/test-custom-thread-linked-blocking"))
+        .and(accept(MediaType.APPLICATION_JSON));
+
+    Duration pollingInterval = Duration.ofMillis(100L);
+    Duration pollingTimeout = Duration.ofMillis(60 * 1000L);
+
+    int corePoolSize = 20;
+    int maxPoolSize = 100;
+    int maxQueue = 900000;
+
+    double maxPoolSizeLimitByPercent = 50;
+
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(corePoolSize, maxPoolSize,
+        30L, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(maxQueue),
+        new NamingThreadFactory("customThreadPoolLinkedBlocking")
+    );
+
+    LinkedBlockingThreadsService linkedBlockingThreadsService =
+        new LinkedBlockingThreadsService(executor, pollingInterval, pollingTimeout, maxPoolSizeLimitByPercent);
+    HandlerFunction<ServerResponse> handlerFunction = request -> linkedBlockingThreadsService.handle()
         .then(ServerResponse.status(HttpStatus.OK).build());
 
     return route(requestPredicate, handlerFunction);

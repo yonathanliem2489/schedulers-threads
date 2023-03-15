@@ -6,7 +6,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import lombok.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cloud.sleuth.instrument.web.WebFluxSleuthOperators;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
@@ -52,9 +51,9 @@ public class DefaultVariableService {
           return profile1;
         })
         .then(buildResponse(name, age))
-        .doOnNext(result -> WebFluxSleuthOperators
-            .withSpanInScope(SignalType.ON_NEXT, signal ->
-                logger.info("Hello from simple [{}]", signal.get())))
+//        .doOnNext(result -> WebFluxSleuthOperators
+//            .withSpanInScope(SignalType.ON_NEXT, signal ->
+//                logger.info("Hello from simple [{}]", signal.get())))
         .subscribeOn(Schedulers.newSingle("modifiersVariable"));
   }
 

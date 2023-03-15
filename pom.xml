@@ -18,23 +18,30 @@
 <!--		<spring-cloud.version>2021.0.4</spring-cloud.version>-->
 		<spring-cloud-sleuth.version>3.1.0</spring-cloud-sleuth.version>
 		<reactor.scheduler.factory.starter.version>1.0.3</reactor.scheduler.factory.starter.version>
+		<bus.common.version>1.0.87</bus.common.version>
 	</properties>
 
 
 	<dependencyManagement>
 		<dependencies>
-			<dependency>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-sleuth</artifactId>
-				<version>${spring-cloud-sleuth.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
+<!--			<dependency>-->
+<!--				<groupId>org.springframework.cloud</groupId>-->
+<!--				<artifactId>spring-cloud-sleuth</artifactId>-->
+<!--				<version>${spring-cloud-sleuth.version}</version>-->
+<!--				<type>pom</type>-->
+<!--				<scope>import</scope>-->
+<!--			</dependency>-->
 
 			<dependency>
 				<groupId>com.tiket.tix.common.spring</groupId>
 				<artifactId>reactor-scheduler-factory-starter</artifactId>
 				<version>${reactor.scheduler.factory.starter.version}</version>
+			</dependency>
+
+			<dependency>
+				<groupId>com.tiket.tix.bus.model</groupId>
+				<artifactId>common-models</artifactId>
+				<version>${bus.common.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
@@ -68,11 +75,20 @@
 			<version>1.18.22</version>
 		</dependency>
 
+<!--		<dependency>-->
+<!--			<groupId>org.springframework.cloud</groupId>-->
+<!--			<artifactId>spring-cloud-starter-sleuth</artifactId>-->
+<!--		</dependency>-->
+
 		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-sleuth</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
 		</dependency>
 
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-mongodb</artifactId>
+		</dependency>
 
 <!--		<dependency>-->
 <!--			<groupId>org.springframework.cloud</groupId>-->
@@ -85,8 +101,22 @@
 			<artifactId>reactor-scheduler-factory-starter</artifactId>
 		</dependency>
 
-		
-	</dependencies>
+		<dependency>
+			<groupId>com.tiket.tix.bus.model</groupId>
+			<artifactId>common-models</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.tomcat.embed</groupId>
+					<artifactId>tomcat-embed-core</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+    <dependency>
+      <groupId>com.google.code.findbugs</groupId>
+      <artifactId>annotations</artifactId>
+      <version>3.0.2</version>
+    </dependency>
+  </dependencies>
 
 
 	<build>
