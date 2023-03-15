@@ -11,6 +11,7 @@ import demo.clean.code.schedulers.CustomCachedBoundedElasticService;
 import demo.clean.code.schedulers.CustomCachedParallelService;
 import demo.clean.code.schedulers.CustomThreadsService;
 import demo.clean.code.schedulers.LinkedBlockingThreadsService;
+import demo.clean.code.schedulers.MemoryLeakService;
 import demo.clean.code.schedulers.MultipleBoundedElasticService;
 import demo.clean.code.schedulers.NewBoundedElasticService;
 import demo.clean.code.schedulers.NewParallelService;
@@ -286,6 +287,28 @@ public class SchedulersEndpointConfiguration {
     NewSingleService newSingleService = new NewSingleService();
     HandlerFunction<ServerResponse> handlerFunction = request -> newSingleService.handle()
         .then(ServerResponse.status(HttpStatus.OK).build());
+
+    return route(requestPredicate, handlerFunction);
+  }
+
+  @Bean
+  RouterFunction<ServerResponse> memoryLeakEndpoint() {
+
+    RequestPredicate requestPredicate = method(HttpMethod.GET)
+        .and(path("/test-memory-leak"))
+        .and(accept(MediaType.APPLICATION_JSON));
+
+    String threadName = "memoryLeakThread";
+    Supplier<Scheduler> schedulerSupplier =
+        () -> Schedulers.newBoundedElastic(1000, 50,
+            new DefaultThreadFactory(threadName, false, Thread.NORM_PRIORITY),
+            30);
+
+    MemoryLeakService memoryLeakService =
+        new MemoryLeakService();
+    HandlerFunction<ServerResponse> handlerFunction = request -> memoryLeakService.handle()
+        .then(ServerResponse.status(HttpStatus.OK).build()).subscribeOn(SchedulersUtils
+            .boundedElastic(threadName, schedulerSupplier));
 
     return route(requestPredicate, handlerFunction);
   }
