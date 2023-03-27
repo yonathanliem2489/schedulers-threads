@@ -305,10 +305,10 @@ public class SchedulersEndpointConfiguration {
             30);
 
     MemoryLeakService memoryLeakService =
-        new MemoryLeakService();
-    HandlerFunction<ServerResponse> handlerFunction = request -> memoryLeakService.handle()
-        .then(ServerResponse.status(HttpStatus.OK).build()).subscribeOn(SchedulersUtils
+        new MemoryLeakService(SchedulersUtils
             .boundedElastic(threadName, schedulerSupplier));
+    HandlerFunction<ServerResponse> handlerFunction = request -> memoryLeakService.handle()
+        .then(ServerResponse.status(HttpStatus.OK).build());
 
     return route(requestPredicate, handlerFunction);
   }
