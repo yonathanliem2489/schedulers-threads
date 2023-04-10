@@ -2,4 +2,6 @@ org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
   demo.clean.code.EndpointConfiguration,\
   demo.clean.code.SchedulersEndpointConfiguration,\
   demo.clean.code.dao.config.MongoReactiveConfiguration,\
-  demo.clean.code.service.core.CoreConfiguration
+  demo.clean.code.service.core.CoreConfiguration,\
+  demo.clean.code.MonoEndpointConfiguration,\
+  demo.clean.code.redis.RedisConfiguration

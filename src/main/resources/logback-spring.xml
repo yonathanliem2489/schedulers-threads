@@ -8,7 +8,7 @@
   <springProperty scope="context" name="applicationName" source="spring.application.name"/>
 
   <property name="STDOUT_LOG_PATTERN"
-    value="[%level] %date{YYYY-MM-dd HH:mm:ss.SSS} [${applicationName}][%X{traceId:-}][%X{spanId:-}] [%thread] %logger{10} %msg%n" />
+    value="[%level] %date{YYYY-MM-dd HH:mm:ss.SSS} [${applicationName}][%X{X-B3-TraceId:-}][%X{X-B3-SpanId:-}][%X{traceId},%X{spanId}] [%thread] %logger{10} %msg%n" />
 
   <appender class="ch.qos.logback.core.ConsoleAppender" name="STDOUT">
     <encoder>

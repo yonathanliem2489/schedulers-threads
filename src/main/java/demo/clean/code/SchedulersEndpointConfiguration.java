@@ -6,10 +6,11 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
 import demo.clean.code.model.factory.NamingThreadFactory;
+import demo.clean.code.redis.MonoRedisTemplate;
 import demo.clean.code.schedulers.BoundedElasticService;
 import demo.clean.code.schedulers.CustomCachedBoundedElasticService;
-import demo.clean.code.schedulers.CustomCachedParallelService;
 import demo.clean.code.schedulers.CustomThreadsService;
+import demo.clean.code.schedulers.HandlerRedisMappingService;
 import demo.clean.code.schedulers.LinkedBlockingThreadsService;
 import demo.clean.code.schedulers.MemoryLeakService;
 import demo.clean.code.schedulers.MultipleBoundedElasticService;
@@ -35,6 +36,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -105,39 +107,12 @@ public class SchedulersEndpointConfiguration {
         .and(accept(MediaType.APPLICATION_JSON));
 
     String threadName = "customCachedThreadBounded";
-    Supplier<Scheduler> schedulerSupplier =
-        () -> Schedulers.newBoundedElastic(1000, 50,
-            new DefaultThreadFactory(threadName, false, Thread.NORM_PRIORITY),
-            30);
 
     CustomCachedBoundedElasticService customCachedBoundedElasticService =
         new CustomCachedBoundedElasticService(SchedulersUtils
-            .boundedElastic(threadName, schedulerSupplier));
+            .boundedElastic(threadName, 500, 50,
+                 30, false));
     HandlerFunction<ServerResponse> handlerFunction = request -> customCachedBoundedElasticService.handle()
-        .then(ServerResponse.status(HttpStatus.OK).build());
-
-    return route(requestPredicate, handlerFunction);
-  }
-
-  /**
-   * FIXING live thread can not evicted
-   * @return
-   */
-  @Bean
-  RouterFunction<ServerResponse> customCachedBoundedParallelEndpoint() {
-
-    RequestPredicate requestPredicate = method(HttpMethod.GET)
-        .and(path("/test-custom-cached-parallel"))
-        .and(accept(MediaType.APPLICATION_JSON));
-
-    String threadName = "customCachedThreadParallel";
-    Supplier<Scheduler> schedulerSupplier =
-        () -> Schedulers.newParallel(threadName, 300, false);
-
-    CustomCachedParallelService customCachedParallelService =
-        new CustomCachedParallelService(SchedulersUtils
-            .parallel(threadName, schedulerSupplier));
-    HandlerFunction<ServerResponse> handlerFunction = request -> customCachedParallelService.handle()
         .then(ServerResponse.status(HttpStatus.OK).build());
 
     return route(requestPredicate, handlerFunction);
@@ -299,15 +274,36 @@ public class SchedulersEndpointConfiguration {
         .and(accept(MediaType.APPLICATION_JSON));
 
     String threadName = "memoryLeakThread";
-    Supplier<Scheduler> schedulerSupplier =
-        () -> Schedulers.newBoundedElastic(1000, 50,
-            new DefaultThreadFactory(threadName, false, Thread.NORM_PRIORITY),
-            30);
 
     MemoryLeakService memoryLeakService =
         new MemoryLeakService(SchedulersUtils
-            .boundedElastic(threadName, schedulerSupplier));
+            .boundedElastic(threadName, 1000, 50,
+                30, false));
     HandlerFunction<ServerResponse> handlerFunction = request -> memoryLeakService.handle()
+        .then(ServerResponse.status(HttpStatus.OK).build());
+
+    return route(requestPredicate, handlerFunction);
+  }
+
+  @Bean
+  RouterFunction<ServerResponse> handlerRedisMappingEndpoint(
+      MonoRedisTemplate monoRedisTemplate, ReactiveMongoTemplate reactiveMongoTemplate) {
+
+    RequestPredicate requestPredicate = method(HttpMethod.GET)
+        .and(path("/test-handler-redis-mapping"))
+        .and(accept(MediaType.APPLICATION_JSON));
+
+    String threadName = "handlerRedisMappingEndpoint";
+    String mappingThreadName = "afterRedisAndMongo";
+
+    HandlerRedisMappingService handlerRedisMappingService =
+        new HandlerRedisMappingService(monoRedisTemplate, reactiveMongoTemplate, SchedulersUtils
+            .boundedElastic(threadName, 2, 1,
+                 30, false), SchedulersUtils
+            .boundedElastic(mappingThreadName, 2, 1,
+                 30, false));
+    HandlerFunction<ServerResponse> handlerFunction = request -> handlerRedisMappingService.handle(Boolean.valueOf(request.queryParam("isDelay").get()))
+        .doOnSuccess(res -> log.info("return handlerRedisMappingEndpoint, result {}", res))
         .then(ServerResponse.status(HttpStatus.OK).build());
 
     return route(requestPredicate, handlerFunction);

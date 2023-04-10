@@ -16,6 +16,8 @@ import demo.clean.code.model.bus.sync.order.OrderData;
 import demo.clean.code.model.bus.sync.order.OrderData.OrderCartDetailResponse;
 import demo.clean.code.model.request.cart_service.CreateCartRequest;
 import demo.clean.code.model.response.AvailableTripsResponse;
+import demo.clean.code.model.response.LocationPointResponse;
+import demo.clean.code.model.response.LocationPointsData;
 import demo.clean.code.schedulers.config.SchedulersUtils;
 import demo.clean.code.service.CartServiceImpl;
 import demo.clean.code.service.DefaultVariableService;
@@ -25,7 +27,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -147,9 +151,6 @@ public class EndpointConfiguration {
     CartService cartService = new CartServiceImpl();
 
     String threadName = "createCartServiceEndpoint";
-    Supplier<Scheduler> schedulerSupplier =
-        () -> Schedulers.newBoundedElastic(3000, 50,
-            threadName, 30, false);
 
     RequestPredicate requestPredicate = method(HttpMethod.POST)
         .and(path("/create-cart"))
@@ -159,7 +160,7 @@ public class EndpointConfiguration {
         request.bodyToMono(CreateCartRequest.class)
             .flatMap(cartService::create)
             .then(ServerResponse.ok().build()).subscribeOn(SchedulersUtils
-                .boundedElastic(threadName, schedulerSupplier));
+                .boundedElastic(threadName, 3000, 50, 30, false));
 
     return route(requestPredicate, handlerFunction);
   }
@@ -178,16 +179,14 @@ public class EndpointConfiguration {
         .and(accept(MediaType.APPLICATION_JSON));
 
     String threadName = "availableTripsBusSupplyEndpoint";
-    Supplier<Scheduler> schedulerSupplier =
-        () -> Schedulers.newBoundedElastic(500, 10,
-            threadName, 30, false);
 
     WebClient webClient = WebClient.builder()
         .baseUrl("http://localhost:8510/zip-with-delay")
         .build();
 
     AvailableTripsService availableTripsService = new AvailableTripsService(webClient,
-        SchedulersUtils.boundedElastic(threadName, schedulerSupplier)
+        SchedulersUtils.boundedElastic(threadName, 500, 10,
+             30, false)
 //    customAvailableTripsBusSupplyEndpoint
     );
 
@@ -208,6 +207,38 @@ public class EndpointConfiguration {
 
     return route(requestPredicate, handlerFunction);
   }
+
+
+  @Bean
+  RouterFunction<ServerResponse> bpdpDetailsBusSupplyEndpoint() throws JsonProcessingException {
+    // http://localhost:8183/rest/v2/bpdpDetails?id=1076686544540097200
+
+    RequestPredicate requestPredicate = method(HttpMethod.GET)
+        .and(path("/rest/v2/bpdpDetails"))
+        .and(accept(MediaType.APPLICATION_JSON));
+
+    String threadName = "bpdpDetailsBusSupplyEndpoint";
+
+    String resp = "{\"boardingPoints\":[{\"id\":1103588,\"name\":\"Blora\",\"address\":\"Jl. Blora No. 30 RT.2/RW.6 RT.2/RW.6, RT.2/RW.6, Dukuh Atas, Menteng, Kec. Menteng, Kota Jakarta Pusat, Daerah Khusus Ibukota Ja\",\"landmark\":\"Pasteur Trans Blora\",\"contactnumber\":\"022230501234\",\"locationName\":\"Jl. Blora No. 30 RT.2/RW.6 RT.2/RW.6, RT.2/RW.6, Dukuh Atas, Menteng, Kec. Menteng, Kota Jakarta Pusat, Daerah Khusus Ibukota Ja\"},{\"id\":1103572,\"name\":\"Kuningan\",\"address\":\"Jl. H. R. Rasuna Said No.2, RT.2/RW.5, Karet Kuningan, Kecamatan Setiabudi, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta \",\"landmark\":\"Plaza Festival Kuningan\",\"contactnumber\":\"02230501234\",\"locationName\":\"Jl. H. R. Rasuna Said No.2, RT.2/RW.5, Karet Kuningan, Kecamatan Setiabudi, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta \"},{\"id\":1103576,\"name\":\"Jatiwaringin\",\"address\":\"SPBU Pertamina - Jl. Jatiwaringin Raya No. 4 A\",\"landmark\":\"Spbu Pertamina   Jl. Jatiwaringin Raya No. 4 A\",\"contactnumber\":\"022230501234\",\"locationName\":\"SPBU Pertamina - Jl. Jatiwaringin Raya No. 4 A\"}],\"droppingPoints\":[{\"id\":1103570,\"name\":\"Dipatiukur\",\"address\":\" Jl. Dipati Ukur No.100, Lebakgede, Kecamatan Coblong, Kota Bandung, Jawa Barat 40251, Indonesia\",\"landmark\":\"Rumah Makan Pondok Kapau\",\"contactnumber\":\"02230501234\",\"locationName\":\" Jl. Dipati Ukur No.100, Lebakgede, Kecamatan Coblong, Kota Bandung, Jawa Barat 40251, Indonesia\"}]}";
+    ObjectMapper objectMapper = new ObjectMapper();
+    LocationPointResponse locationPointResponse = objectMapper.readValue(resp, LocationPointResponse.class);
+
+
+
+    HandlerFunction<ServerResponse> handlerFunction = request -> ServerResponse.ok()
+        .bodyValue(locationPointResponse.toBuilder()
+            .droppingPoints(locationPointResponse.getDroppingPoints().stream().map(drop -> drop.toBuilder()
+
+                .build()).collect(
+                Collectors.toList()))
+            .build())
+        .subscribeOn(SchedulersUtils.boundedElastic(threadName, 500, 10,
+             30, false));
+
+    return route(requestPredicate, handlerFunction);
+  }
+
+
 
   private class AvailableTripsService {
 
@@ -354,9 +385,9 @@ public class EndpointConfiguration {
       }
 
       return Mono.just(availableTripsResponse)
-          .doOnSuccess(res -> log.info("before get webClient"))
-          .flatMap(response -> webClient.get().exchangeToMono(clientResponse -> Mono.just(availableTripsResponse)))
-          .doOnSuccess(res -> log.info("after get webClient"))
+//          .doOnSuccess(res -> log.info("before get webClient"))
+//          .flatMap(response -> webClient.get().exchangeToMono(clientResponse -> Mono.just(availableTripsResponse)))
+//          .doOnSuccess(res -> log.info("after get webClient"))
           .subscribeOn(scheduler);
     }
   }
@@ -367,9 +398,6 @@ public class EndpointConfiguration {
     CartService cartService = new CartServiceImpl();
 
     String threadName = "availableTripsBusSupplyEndpoint";
-    Supplier<Scheduler> schedulerSupplier =
-        () -> Schedulers.newBoundedElastic(500, 50,
-            threadName, 30, false);
 
     RequestPredicate requestPredicate = method(HttpMethod.POST)
         .and(path("/tix-order-go/v1/create-order"))
@@ -397,7 +425,8 @@ public class EndpointConfiguration {
         ServerResponse.ok()
             .bodyValue(baseResponse)
             .subscribeOn(SchedulersUtils
-                .boundedElastic(threadName, schedulerSupplier));
+                .boundedElastic(threadName, 500, 50,
+                     30, false));
 
     return route(requestPredicate, handlerFunction);
   }

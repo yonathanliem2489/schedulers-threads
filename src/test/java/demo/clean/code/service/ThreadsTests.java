@@ -1,8 +1,12 @@
 package demo.clean.code.service;
 
+import java.util.Arrays;
 import java.util.Random;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 @Slf4j
 public class ThreadsTests {
@@ -83,6 +87,41 @@ public class ThreadsTests {
     System.out.println("getstate6 "+de.getState());
   }
 
+  @Test
+  public void MonoDefer_Test() {
+
+    Mono.just("123")
+        .doOnSuccess(res -> log.info("before defer"))
+        .flatMap(res -> Mono.defer(() -> generateRandom())
+            .doOnSuccess(num -> log.info("after defer")))
+        .then().block();
+
+  }
+
+  @Test
+  public void SwitchIfEmpty_Test() {
+
+    SwitchIfEmpty switchIfEmpty = new SwitchIfEmpty();
+    StepVerifier.create(switchIfEmpty.handle("456"))
+        .expectSubscription().thenAwait()
+        .expectNext(true)
+        .verifyComplete();
+  }
+
+  protected class SwitchIfEmpty {
+    public Mono<Boolean> handle(String age) {
+      return Mono.just(age)
+          .filter("123"::equalsIgnoreCase)
+          .doOnNext(res -> log.info("before mono defer"))
+          .switchIfEmpty(Mono.just("to empty").doOnSuccess(toEmpty -> log.info("pointer to empty")))
+          .doOnSuccess(res -> log.info("finish"))
+          .thenReturn(true);
+    }
+  }
+
+  private Mono<Integer> generateRandom() {
+    return Mono.just((int) Math.random());
+  }
 
   public class ThreadNumber extends Thread {
 
