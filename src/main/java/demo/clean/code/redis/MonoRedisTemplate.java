@@ -1,69 +1,67 @@
 package demo.clean.code.redis;
 
-import com.tiket.tix.bus.model.common.metric.Monitor;
-import com.tiket.tix.bus.model.common.metric.utility.SubmitMetric;
-import demo.clean.code.exception.BusinessLogicException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
-import reactor.core.publisher.Flux;
+import org.springframework.data.redis.core.RedisTemplate;
 import reactor.core.publisher.Mono;
 
 public class MonoRedisTemplate {
+
+  @Autowired
+  private ObjectMapper mapper;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(MonoRedisTemplate.class);
 
   private ReactiveRedisTemplate<String, Object> reactiveRedisTemplate;
 
+  private RedisTemplate<String, String> redisTemplateCustom;
 
   @Value("${bus.shuttle.supply.redis.metric-status:true}")
   private boolean metricStatus;
 
 
   public MonoRedisTemplate(
-                           ReactiveRedisTemplate<String, Object> reactiveRedisTemplate) {
+                           ReactiveRedisTemplate<String, Object> reactiveRedisTemplate,
+      RedisTemplate<String, String> redisTemplateCustom) {
     this.reactiveRedisTemplate = reactiveRedisTemplate;
+    this.redisTemplateCustom = redisTemplateCustom;
   }
 
-  public Mono<Boolean> evict(String key) {
-    return reactiveRedisTemplate
-      .opsForValue()
-      .delete(key)
-      .onErrorResume(throwable -> Mono.error(new BusinessLogicException("SYSTEM_ERROR", "system error")))
-      .defaultIfEmpty(false);
-  }
 
-  public Flux<Object> getSet(String key) {
-    LOGGER.info("Read from redis, key: {}", key);
-    return reactiveRedisTemplate
-      .opsForSet()
-      .members(key)
-      .onErrorResume(throwable ->
-        Flux.error(new BusinessLogicException("SYSTEM_ERROR", "system error"))
-      ).defaultIfEmpty(Flux.error(new BusinessLogicException("DATA_NOT_EXIST", "data not exist")));
-  }
 
-  public Mono<Object> getCache(String key) {
-    LOGGER.info("getCache from redis, key: {}", key);
-    return reactiveRedisTemplate
-      .opsForValue()
-      .get(key)
-      .onErrorResume(throwable -> Mono.just(false));
+  public <T> Mono<T> getCache(String key, Class<T> tClass) {
+//    LOGGER.info("getCache from redis, key: {}", key);
+    return Mono.fromCallable(() -> redisTemplateCustom.opsForValue().get(key))
+        .map(tClass::cast)
+        .doOnSuccess(result -> LOGGER.info("jedis success getCache from redis, key: {}", key));
+//    return reactiveRedisTemplate
+//      .opsForValue()
+//      .get(key)
+//      .map(tClass::cast)
+//      .doOnSuccess(result -> LOGGER.info("lettuce success getCache from redis, key: {}", key))
+//      .onErrorResume(throwable -> Mono.error(new Exception("error parse")));
   }
 
   public Mono<Boolean> put(String key, Object value, Duration duration) {
-    LOGGER.info("Put to redis, key: {} ttl: {} seconds", key, duration.getSeconds());
-    return reactiveRedisTemplate
-      .opsForValue()
-      .set(key, value, duration)
+//    LOGGER.info("Put to redis, key: {} ttl: {} seconds", key, duration.getSeconds());
+
+    return Mono.fromRunnable(() -> redisTemplateCustom.opsForValue().set(key, String.valueOf(value), duration))
+        .doOnSuccess(result -> LOGGER.info("jedis success Put to redis, key: {} ttl: {} seconds", key, duration.getSeconds()))
         .doOnError(throwable -> LOGGER.error("error", throwable))
-      .onErrorResume(throwable -> Mono.just(false));
+        .onErrorResume(throwable -> Mono.just(false))
+        .thenReturn(true);
+
+//    return reactiveRedisTemplate
+//      .opsForValue()
+//      .set(key, value, duration)
+//      .doOnSuccess(result -> LOGGER.info("lettuce success Put to redis, key: {} ttl: {} seconds", key, duration.getSeconds()))
+//        .doOnError(throwable -> LOGGER.error("error", throwable))
+//      .onErrorResume(throwable -> Mono.just(false));
   }
 
-  public Mono<Boolean> isExist(String key){
-    LOGGER.info("check if cache with key: {} is exists", key);
-    return reactiveRedisTemplate.hasKey(key);
-  }
 }

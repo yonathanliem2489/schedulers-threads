@@ -122,7 +122,7 @@ public class ParallelAndZipTest {
   private Mono<Boolean> monoWithDelay() {
     return Mono.just(true)
         .doOnSuccess(resMono -> log.info("start monoWithDelay process"))
-        .flatMap(dt -> outboundService())
+//        .flatMap(dt -> outboundService())
         .doOnSuccess(resMono -> log.info("end monoWithDelay process"));
   }
 

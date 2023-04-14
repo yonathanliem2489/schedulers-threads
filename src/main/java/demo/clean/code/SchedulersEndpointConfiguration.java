@@ -40,6 +40,7 @@ import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.RequestPredicate;
 import org.springframework.web.reactive.function.server.RouterFunction;
@@ -296,15 +297,19 @@ public class SchedulersEndpointConfiguration {
     String threadName = "handlerRedisMappingEndpoint";
     String mappingThreadName = "afterRedisAndMongo";
 
+    WebClient webClient = WebClient.builder()
+        .baseUrl("http://localhost:8510/endpoint-with-delay")
+        .build();
+
     HandlerRedisMappingService handlerRedisMappingService =
-        new HandlerRedisMappingService(monoRedisTemplate, reactiveMongoTemplate, SchedulersUtils
-            .boundedElastic(threadName, 2, 1,
+        new HandlerRedisMappingService(webClient, monoRedisTemplate, reactiveMongoTemplate, SchedulersUtils
+            .boundedElastic(threadName, 50, 100,
                  30, false), SchedulersUtils
-            .boundedElastic(mappingThreadName, 2, 1,
+            .boundedElastic(mappingThreadName, 50, 100,
                  30, false));
     HandlerFunction<ServerResponse> handlerFunction = request -> handlerRedisMappingService.handle(Boolean.valueOf(request.queryParam("isDelay").get()))
         .doOnSuccess(res -> log.info("return handlerRedisMappingEndpoint, result {}", res))
-        .then(ServerResponse.status(HttpStatus.OK).build());
+        .flatMap(redisMapping -> ServerResponse.status(HttpStatus.OK).build());
 
     return route(requestPredicate, handlerFunction);
   }

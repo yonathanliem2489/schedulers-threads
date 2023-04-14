@@ -13,28 +13,28 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.JdkSerializationRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
 @EnableConfigurationProperties(RedisConfigurationProperties.class)
 public class RedisConfiguration {
 
-  private final RedisConfigurationProperties redisConfigurationProperties;
-
   @Autowired
-  public RedisConfiguration(
-      RedisConfigurationProperties redisConfigurationProperties) {
-    this.redisConfigurationProperties = redisConfigurationProperties;
-  }
+  private RedisConfigurationProperties redisConfigurationProperties;
+
 
   @Bean
   public RedisStandaloneConfiguration redisStandaloneConfiguration() {
@@ -57,7 +57,7 @@ public class RedisConfiguration {
 
   @Bean
   LettucePoolingClientConfiguration lettucePoolConfig(ClientOptions options, ClientResources dcr){
-    GenericObjectPoolConfig<LettuceClientConfiguration> poolConfig = new GenericObjectPoolConfig<>();
+    GenericObjectPoolConfig poolConfig = new GenericObjectPoolConfig();
     poolConfig.setMaxIdle(redisConfigurationProperties.getMaxIdle());
     poolConfig.setMaxTotal(redisConfigurationProperties.getMaxTotal());
     poolConfig.setMinIdle(redisConfigurationProperties.getMinIdle());
@@ -97,8 +97,26 @@ public class RedisConfiguration {
   }
 
   @Bean
+  @Primary
+  JedisConnectionFactory jedisConnectionFactory(RedisStandaloneConfiguration redisStandaloneConfiguration) {
+    return new JedisConnectionFactory(redisStandaloneConfiguration);
+  }
+
+  @Bean
+  public RedisTemplate<String, String> redisTemplateCustom(JedisConnectionFactory jedisConnectionFactory) {
+    RedisTemplate<String, String> template = new RedisTemplate<>();
+    template.setConnectionFactory(jedisConnectionFactory);
+    template.setKeySerializer(RedisSerializer.string());
+    template.setValueSerializer(RedisSerializer.string());
+
+
+    return template;
+  }
+
+  @Bean
   public MonoRedisTemplate monoRedisTemplate(
-    ReactiveRedisTemplate<String, Object> reactiveRedisTemplate){
-    return new MonoRedisTemplate(reactiveRedisTemplate);
+    ReactiveRedisTemplate<String, Object> reactiveRedisTemplate,
+      RedisTemplate<String, String> redisTemplateCustom){
+    return new MonoRedisTemplate(reactiveRedisTemplate, redisTemplateCustom);
   }
 }
