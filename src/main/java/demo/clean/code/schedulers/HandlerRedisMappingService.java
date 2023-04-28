@@ -1,15 +1,16 @@
 package demo.clean.code.schedulers;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import demo.clean.code.redis.MonoRedisTemplate;
+import java.io.Serializable;
 import java.time.Duration;
 import java.util.UUID;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.types.ObjectId;
-import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
-import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -40,22 +41,23 @@ public class HandlerRedisMappingService {
     this.schedulerMapping = schedulerMapping;
   }
 
-  public Mono<RedisMapping> handle(boolean isDelay) {
-    UUID uuid = UUID.randomUUID();
-    RedisMapping redisMapping = RedisMapping.builder()
-      .name(uuid.toString())
-      .build();
+  public Mono<Void> handle(boolean isDelay) {
 
     return Flux.range(0, 2000)
-        .flatMap(req -> monoRedisTemplate.put(uuid.toString(), "abc", Duration.ofSeconds(60))
-            .doOnSuccess(resRedisPut -> log.info("after call webclient - result of redis put before set main thread"))
+        .flatMap(req -> {
+          UUID uuid = UUID.randomUUID();
+          RedisMapping redisMapping = RedisMapping.builder()
+              .name(uuid.toString())
+              .build();
+          return monoRedisTemplate.put(uuid.toString(), redisMapping, Duration.ofSeconds(30))
+              .doOnSuccess(resRedisPut -> log.info("after call webclient - result of redis put before set main thread"))
 //            .publishOn(boundedElastic) // toggle for test
               .doOnSuccess(resRedisPut -> log.info("after call webclient - result of redis put after set main thread"))
-            .flatMap(resRedisPut -> monoRedisTemplate.getCache(uuid.toString(), String.class)
-                .doOnSuccess(resRedisGet -> log.info("redis after call get {}", resRedisGet)))
-        )
+              .flatMap(resRedisPut -> monoRedisTemplate.getCache(uuid.toString(), RedisMapping.class)
+                  .doOnSuccess(resRedisGet -> log.info("redis after call get {}", resRedisGet)));
+        })
         .collectList()
-        .thenReturn(redisMapping)
+        .then()
 
 
 //    return Mono.just("request")
@@ -97,20 +99,18 @@ public class HandlerRedisMappingService {
         .doOnSuccess(mapping -> log.info("success processing"));
   }
 
-  @Document(
-      collection = "redisMapping"
-  )
+
   @Getter
   @ToString
-  public static class RedisMapping {
-    @Id
-    private ObjectId id;
+  @EqualsAndHashCode
+  public static class RedisMapping implements Serializable {
 
+    @JsonProperty("name")
     private String name;
 
+    @JsonCreator
     @lombok.Builder(builderClassName = "Builder")
-    public RedisMapping(ObjectId id, String name) {
-      this.id = id;
+    public RedisMapping(@JsonProperty("name") String name) {
       this.name = name;
     }
   }

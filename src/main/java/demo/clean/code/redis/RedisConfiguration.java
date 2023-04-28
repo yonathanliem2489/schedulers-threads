@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
@@ -75,6 +76,12 @@ public class RedisConfiguration {
   }
 
   @Bean
+  public LettuceConnectionFactory lettuceRedisConnectionFactory(RedisStandaloneConfiguration redisStandaloneConfiguration,
+      LettucePoolingClientConfiguration lettucePoolConfig) {
+    return new LettuceConnectionFactory(redisStandaloneConfiguration, lettucePoolConfig);
+  }
+
+  @Bean
   public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
       ReactiveRedisConnectionFactory reactiveRedisConnectionFactory,
       ResourceLoader resourceLoader) {
@@ -103,11 +110,18 @@ public class RedisConfiguration {
   }
 
   @Bean
-  public RedisTemplate<String, String> redisTemplateCustom(JedisConnectionFactory jedisConnectionFactory) {
-    RedisTemplate<String, String> template = new RedisTemplate<>();
-    template.setConnectionFactory(jedisConnectionFactory);
-    template.setKeySerializer(RedisSerializer.string());
-    template.setValueSerializer(RedisSerializer.string());
+  public RedisTemplate<String, Object> redisTemplateCustom(
+      JedisConnectionFactory jedisConnectionFactory,
+      LettuceConnectionFactory lettuceRedisConnectionFactory, ResourceLoader resourceLoader) {
+    JdkSerializationRedisSerializer jdkSerializer = new JdkSerializationRedisSerializer(
+        Objects.requireNonNull(resourceLoader.getClassLoader()));
+
+    RedisTemplate<String, Object> template = new RedisTemplate<>();
+    template.setConnectionFactory(lettuceRedisConnectionFactory);
+    template.setKeySerializer(new StringRedisSerializer());
+    template.setValueSerializer(jdkSerializer);
+    template.setHashKeySerializer(jdkSerializer);
+    template.setHashValueSerializer(jdkSerializer);
 
 
     return template;
@@ -116,7 +130,7 @@ public class RedisConfiguration {
   @Bean
   public MonoRedisTemplate monoRedisTemplate(
     ReactiveRedisTemplate<String, Object> reactiveRedisTemplate,
-      RedisTemplate<String, String> redisTemplateCustom){
+      RedisTemplate<String, Object> redisTemplateCustom){
     return new MonoRedisTemplate(reactiveRedisTemplate, redisTemplateCustom);
   }
 }

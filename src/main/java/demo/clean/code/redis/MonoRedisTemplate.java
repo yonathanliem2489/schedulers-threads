@@ -19,7 +19,7 @@ public class MonoRedisTemplate {
 
   private ReactiveRedisTemplate<String, Object> reactiveRedisTemplate;
 
-  private RedisTemplate<String, String> redisTemplateCustom;
+  private RedisTemplate<String, Object> redisTemplateCustom;
 
   @Value("${bus.shuttle.supply.redis.metric-status:true}")
   private boolean metricStatus;
@@ -27,7 +27,7 @@ public class MonoRedisTemplate {
 
   public MonoRedisTemplate(
                            ReactiveRedisTemplate<String, Object> reactiveRedisTemplate,
-      RedisTemplate<String, String> redisTemplateCustom) {
+      RedisTemplate<String, Object> redisTemplateCustom) {
     this.reactiveRedisTemplate = reactiveRedisTemplate;
     this.redisTemplateCustom = redisTemplateCustom;
   }
@@ -35,7 +35,7 @@ public class MonoRedisTemplate {
 
 
   public <T> Mono<T> getCache(String key, Class<T> tClass) {
-//    LOGGER.info("getCache from redis, key: {}", key);
+    LOGGER.info("getCache from redis, key: {}", key);
     return Mono.fromCallable(() -> redisTemplateCustom.opsForValue().get(key))
         .map(tClass::cast)
         .doOnSuccess(result -> LOGGER.info("jedis success getCache from redis, key: {}", key));
@@ -44,13 +44,13 @@ public class MonoRedisTemplate {
 //      .get(key)
 //      .map(tClass::cast)
 //      .doOnSuccess(result -> LOGGER.info("lettuce success getCache from redis, key: {}", key))
-//      .onErrorResume(throwable -> Mono.error(new Exception("error parse")));
+//      .onErrorResume(throwable -> Mono.error(new Exception(throwable.getMessage())));
   }
 
   public Mono<Boolean> put(String key, Object value, Duration duration) {
-//    LOGGER.info("Put to redis, key: {} ttl: {} seconds", key, duration.getSeconds());
+    LOGGER.info("Put to redis, key: {} ttl: {} seconds", key, duration.getSeconds());
 
-    return Mono.fromRunnable(() -> redisTemplateCustom.opsForValue().set(key, String.valueOf(value), duration))
+    return Mono.fromRunnable(() -> redisTemplateCustom.opsForValue().set(key, value, duration))
         .doOnSuccess(result -> LOGGER.info("jedis success Put to redis, key: {} ttl: {} seconds", key, duration.getSeconds()))
         .doOnError(throwable -> LOGGER.error("error", throwable))
         .onErrorResume(throwable -> Mono.just(false))
